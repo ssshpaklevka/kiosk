@@ -208,6 +208,8 @@ fi
 
 disable_screensaver_and_dpms
 
-echo "[...] Запускаю setup с sudo..."
-sudo ./"$SETUP_NAME"
+echo "[...] Запускаю setup с sudo в фоне..."
+sudo ./"$SETUP_NAME" > "$INSTALL_DIR/setup.log" 2>&1 &
+SETUP_PID=$!
+echo "[OK] setup запущен (PID: $SETUP_PID), логи: $INSTALL_DIR/setup.log"
 echo "=== Готово ==="
