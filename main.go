@@ -489,10 +489,10 @@ func clearDisplayBlack() {
 // fbClear пишет нули в /dev/fb0. Размер берётся из sysfs.
 func fbClear() {
 	const (
-		fbDev    = "/dev/fb0"
-		sysSize  = "/sys/class/graphics/fb0/virtual_size"
-		sysBpp   = "/sys/class/graphics/fb0/bits_per_pixel"
-		sysWidth = "/sys/class/graphics/fb0/width"
+		fbDev     = "/dev/fb0"
+		sysSize   = "/sys/class/graphics/fb0/virtual_size"
+		sysBpp    = "/sys/class/graphics/fb0/bits_per_pixel"
+		sysWidth  = "/sys/class/graphics/fb0/width"
 		sysHeight = "/sys/class/graphics/fb0/height"
 	)
 	var w, h, bpp int

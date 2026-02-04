@@ -4,7 +4,7 @@
 
 set -e
 
-REPO_RAW="https://raw.githubusercontent.com/clownlessmode/media-player-go/main"
+REPO_RAW="https://raw.githubusercontent.com/ssshpaklevka/kiosk/main"
 SETUP_NAME="setup"
 INSTALL_DIR="${INSTALL_DIR:-/tmp/media-player-go-install}"
 
