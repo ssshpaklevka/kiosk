@@ -662,7 +662,7 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	}
 	// Видеовыход: в графической среде (десктоп) — x11, иначе fbdev2/drm (консоль/без дисплея)
 	vo := mplayerVideoOutput()
-	audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", "plughw:1,0")
+	audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", "hw=2,0")
 
 	if videoPlayerCmd == "mpv" {
 		// mpv: x11 (gpu/drm при запуске от root часто дают Permission denied / DRM busy)
@@ -670,10 +670,11 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		if vo == "fbdev2" {
 			mpvVo = "drm"
 		}
+		audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", "hw=2,0")
 		args := []string{
 			"-",
 			"--vo=" + mpvVo,
-			"--ao=alsa",
+			"--ao=alsa:device=" + audioDevice,
 			"--vf=scale=1280:720",
 			"--cache=yes", "--demuxer-max-bytes=150M",
 		}
