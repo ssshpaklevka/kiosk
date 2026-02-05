@@ -155,7 +155,7 @@ func main() {
 			fmt.Println("[mediaplayer] ни одного файла не загрузилось, воспроизведение не запускаю")
 			return
 		}
-		fmt.Printf("[mediaplayer] запускаю воспроизведение (ffmpeg concat → %s, vo=%s)\n", videoPlayerCmd, mplayerVideoOutput())
+		fmt.Printf("[mediaplayer] запускаю воспроизведение (%s плейлист, vo=%s)\n", videoPlayerCmd, mplayerVideoOutput())
 		setDisplayResolution1280x720() // 1280x720 перед воспроизведением (X11)
 		clearDisplayBlack()            // чёрный до первого кадра
 		ctx, cancel := context.WithCancel(context.Background())
@@ -623,41 +623,11 @@ func xauthPath() string {
 	return ""
 }
 
-// runConcatPlayback запускает ffmpeg concat (бесконечный цикл по файлам) в пайп в mplayer.
-// Один непрерывный поток — ни чёрного экрана, ни пауз между роликами.
+// runConcatPlayback запускает mplayer/mpv с плейлистом файлов (без ffmpeg concat).
+// Плейлист работает стабильнее на стыках файлов, чем склеивание через pipe.
 func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	files := listVideoFiles(mediaDir)
 	if len(files) == 0 {
-		return nil, nil
-	}
-	concatPath := filepath.Join(mediaDir, ".concat.txt")
-	var b strings.Builder
-	for _, f := range files {
-		// ffmpeg concat: file 'path'; одинарную кавычку в path — удвоением ''
-		escaped := strings.ReplaceAll(f, "'", "''")
-		b.WriteString("file '")
-		b.WriteString(escaped)
-		b.WriteString("'\n")
-	}
-	if err := os.WriteFile(concatPath, []byte(b.String()), 0600); err != nil {
-		fmt.Fprintf(os.Stderr, "concat list write: %v\n", err)
-		return nil, nil
-	}
-	// ffmpeg: бесконечный цикл по списку; genpts — ровные таймстемпы на стыках файлов, меньше зависаний
-	ffmpeg = exec.Command("ffmpeg",
-		"-stream_loop", "-1",
-		"-f", "concat", "-safe", "0", "-i", concatPath,
-		"-fflags", "+genpts",
-		"-c", "copy", "-f", "matroska", "-",
-	)
-	ffmpeg.Stderr = nil // не смешивать с выводом mplayer
-	pipe, err := ffmpeg.StdoutPipe()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ffmpeg stdout pipe: %v\n", err)
-		return nil, nil
-	}
-	if err := ffmpeg.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "ffmpeg start: %v\n", err)
 		return nil, nil
 	}
 	// Видеовыход: в графической среде (десктоп) — x11, иначе fbdev2/drm (консоль/без дисплея)
@@ -670,9 +640,8 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		if vo == "fbdev2" {
 			mpvVo = "drm"
 		}
-		audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", "hw=2,0")
 		args := []string{
-			"-",
+			"--loop-playlist=inf", // бесконечный повтор плейлиста
 			"--vo=" + mpvVo,
 			"--ao=alsa:device=" + audioDevice,
 			"--vf=scale=1280:720",
@@ -681,8 +650,9 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		if vo == "x11" {
 			args = append(args, "--fs")
 		}
+		// Добавляем все файлы как аргументы
+		args = append(args, files...)
 		mplayer = exec.Command("mpv", args...)
-		mplayer.Stdin = pipe
 		mplayer.Stdout = os.Stdout
 		mplayer.Stderr = os.Stderr
 		if vo == "x11" && mplayerDisplay() != "" {
@@ -700,15 +670,16 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 			mplayer.Env = filtered
 		}
 		if err := mplayer.Start(); err != nil {
-			_ = ffmpeg.Process.Kill()
 			fmt.Fprintf(os.Stderr, "mpv start: %v\n", err)
 			return nil, nil
 		}
-		return ffmpeg, mplayer
+		return nil, mplayer // ffmpeg больше не нужен
 	}
 
-	// mplayer
+	// mplayer: плейлист с -fixed-vo (чёрный экран между файлами) и -loop 0 (бесконечный повтор)
 	args := []string{
+		"-fixed-vo",  // не закрывать окно между файлами (важно для киоска!)
+		"-loop", "0", // бесконечный повтор плейлиста
 		"-ao", "alsa:device=" + audioDevice,
 		"-vo", vo,
 		"-vf", "scale=1280:720",
@@ -718,9 +689,9 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	if vo == "x11" {
 		args = append(args, "-fs")
 	}
-	args = append(args, "-")
+	// Добавляем все файлы как аргументы
+	args = append(args, files...)
 	mplayer = exec.Command("mplayer", args...)
-	mplayer.Stdin = pipe
 	mplayer.Stdout = os.Stdout
 	mplayer.Stderr = os.Stderr
 	if vo == "x11" && mplayerDisplay() != "" {
@@ -738,11 +709,10 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		mplayer.Env = filtered
 	}
 	if err := mplayer.Start(); err != nil {
-		_ = ffmpeg.Process.Kill()
 		fmt.Fprintf(os.Stderr, "mplayer start: %v\n", err)
 		return nil, nil
 	}
-	return ffmpeg, mplayer
+	return nil, mplayer // ffmpeg больше не нужен
 }
 
 func listVideoFiles(mediaDir string) []string {
