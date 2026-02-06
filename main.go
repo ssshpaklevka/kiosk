@@ -33,8 +33,8 @@ var httpClient = &http.Client{
 }
 
 const (
-	checkInPath = "/api/device/check-in"
-	mediaPath   = "/api/device/me/media"
+	checkInPath = "/device/check-in"
+	mediaPath   = "/device/me/media"
 	jwtFile     = ".jwt"
 	mediaDir    = "./media"
 )
