@@ -641,15 +641,11 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 			mpvVo = "drm"
 		}
 		args := []string{
-			"--quiet",             // убрать вывод в консоль (скрыть терминал)
-			"--no-terminal",       // не использовать терминал
 			"--loop-playlist=inf", // бесконечный повтор плейлиста
 			"--vo=" + mpvVo,
 			"--ao=alsa:device=" + audioDevice,
 			"--vf=scale=1280:720",
 			"--cache=yes", "--demuxer-max-bytes=150M",
-			"--video-sync=display-resample", // синхронизация видео (исправляет рассинхрон)
-			"--audio-buffer=0.5",            // буфер звука для плавности
 		}
 		if vo == "x11" {
 			args = append(args, "--fs")
@@ -657,16 +653,8 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		// Добавляем все файлы как аргументы
 		args = append(args, files...)
 		mplayer = exec.Command("mpv", args...)
-		// Логируем ошибки в файл для отладки (но не выводим на экран)
-		logFile, err := os.OpenFile(filepath.Join(mediaDir, ".mpv-errors.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err == nil {
-			mplayer.Stderr = logFile
-			mplayer.Stdout = logFile // также логируем stdout для отладки
-		} else {
-			// Если не удалось открыть файл, перенаправляем в /dev/null
-			mplayer.Stdout = nil
-			mplayer.Stderr = nil
-		}
+		mplayer.Stdout = os.Stdout
+		mplayer.Stderr = os.Stderr
 		if vo == "x11" && mplayerDisplay() != "" {
 			env := os.Environ()
 			var filtered []string
@@ -690,7 +678,6 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 
 	// mplayer: плейлист с -fixed-vo (чёрный экран между файлами) и -loop 0 (бесконечный повтор)
 	args := []string{
-		"-quiet",     // убрать вывод в консоль
 		"-fixed-vo",  // не закрывать окно между файлами (важно для киоска!)
 		"-loop", "0", // бесконечный повтор плейлиста
 		"-ao", "alsa:device=" + audioDevice,
@@ -698,7 +685,6 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		"-vf", "scale=1280:720",
 		"-lavdopts", "lowres=0:fast",
 		"-cache", "32768",
-		"-nosub", // убрать субтитры
 	}
 	if vo == "x11" {
 		args = append(args, "-fs")
@@ -706,16 +692,8 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	// Добавляем все файлы как аргументы
 	args = append(args, files...)
 	mplayer = exec.Command("mplayer", args...)
-	// Логируем ошибки в файл для отладки
-	logFile, err := os.OpenFile(filepath.Join(mediaDir, ".mplayer-errors.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		mplayer.Stderr = logFile
-		mplayer.Stdout = nil // stdout не нужен
-	} else {
-		// Если не удалось открыть файл, перенаправляем в /dev/null
-		mplayer.Stdout = nil
-		mplayer.Stderr = nil
-	}
+	mplayer.Stdout = os.Stdout
+	mplayer.Stderr = os.Stderr
 	if vo == "x11" && mplayerDisplay() != "" {
 		env := os.Environ()
 		var filtered []string
