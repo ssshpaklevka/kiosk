@@ -53,7 +53,7 @@ type MediaItem struct {
 
 func main() {
 	cfg := config{
-		ServerURL: getEnv("SERVER_URL", "http://10.1.2.120:3000"),
+		ServerURL: getEnv("SERVER_URL", "https://statosphera.ru/api/media-player"),
 		MediaDir:  getEnv("MEDIA_DIR", mediaDir),
 	}
 	if err := os.MkdirAll(cfg.MediaDir, 0755); err != nil {
