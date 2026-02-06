@@ -700,7 +700,9 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		"-cache", "32768",
 		"-autosync", "30", // синхронизация A/V (исправляет рассинхрон)
 		"-mc", "2.0", // коррекция звука при рассинхроне
-		"-nosub", // убрать субтитры
+		"-nosub",         // убрать субтитры
+		"-hardframedrop", // пропускать кадры вместо задержек (плавнее переключение)
+		"-framedrop",     // пропускать кадры при перегрузке
 	}
 	if vo == "x11" {
 		args = append(args, "-fs")
