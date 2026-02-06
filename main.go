@@ -641,11 +641,15 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 			mpvVo = "drm"
 		}
 		args := []string{
+			"--quiet",             // убрать вывод в консоль (скрыть терминал)
+			"--no-terminal",       // не использовать терминал
 			"--loop-playlist=inf", // бесконечный повтор плейлиста
 			"--vo=" + mpvVo,
 			"--ao=alsa:device=" + audioDevice,
 			"--vf=scale=1280:720",
 			"--cache=yes", "--demuxer-max-bytes=150M",
+			"--video-sync=display-resample", // синхронизация видео (исправляет рассинхрон)
+			"--audio-buffer=0.5",            // буфер звука для плавности
 		}
 		if vo == "x11" {
 			args = append(args, "--fs")
@@ -653,8 +657,9 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		// Добавляем все файлы как аргументы
 		args = append(args, files...)
 		mplayer = exec.Command("mpv", args...)
-		mplayer.Stdout = os.Stdout
-		mplayer.Stderr = os.Stderr
+		// Перенаправляем вывод в /dev/null чтобы не видно было терминал
+		mplayer.Stdout = nil
+		mplayer.Stderr = nil
 		if vo == "x11" && mplayerDisplay() != "" {
 			env := os.Environ()
 			var filtered []string
@@ -678,6 +683,8 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 
 	// mplayer: плейлист с -fixed-vo (чёрный экран между файлами) и -loop 0 (бесконечный повтор)
 	args := []string{
+		"-really-quiet",    // убрать весь вывод в консоль (скрыть терминал)
+		"-noconfig", "all", // не читать конфиг (избежать конфликтов)
 		"-fixed-vo",  // не закрывать окно между файлами (важно для киоска!)
 		"-loop", "0", // бесконечный повтор плейлиста
 		"-ao", "alsa:device=" + audioDevice,
@@ -685,6 +692,11 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		"-vf", "scale=1280:720",
 		"-lavdopts", "lowres=0:fast",
 		"-cache", "32768",
+		"-autosync", "30", // синхронизация A/V (исправляет рассинхрон)
+		"-mc", "2.0", // коррекция звука при рассинхроне
+		"-nosub",         // убрать субтитры
+		"-af", "volnorm", // нормализация громкости между файлами
+		"-af-adv", "force=1", // принудительно применять аудиофильтры
 	}
 	if vo == "x11" {
 		args = append(args, "-fs")
@@ -692,8 +704,9 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	// Добавляем все файлы как аргументы
 	args = append(args, files...)
 	mplayer = exec.Command("mplayer", args...)
-	mplayer.Stdout = os.Stdout
-	mplayer.Stderr = os.Stderr
+	// Перенаправляем вывод в /dev/null чтобы не видно было терминал
+	mplayer.Stdout = nil
+	mplayer.Stderr = nil
 	if vo == "x11" && mplayerDisplay() != "" {
 		env := os.Environ()
 		var filtered []string
