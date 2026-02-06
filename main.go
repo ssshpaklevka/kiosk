@@ -657,9 +657,16 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 		// Добавляем все файлы как аргументы
 		args = append(args, files...)
 		mplayer = exec.Command("mpv", args...)
-		// Перенаправляем вывод в /dev/null чтобы не видно было терминал
-		mplayer.Stdout = nil
-		mplayer.Stderr = nil
+		// Логируем ошибки в файл для отладки (но не выводим на экран)
+		logFile, err := os.OpenFile(filepath.Join(mediaDir, ".mpv-errors.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			mplayer.Stderr = logFile
+			mplayer.Stdout = logFile // также логируем stdout для отладки
+		} else {
+			// Если не удалось открыть файл, перенаправляем в /dev/null
+			mplayer.Stdout = nil
+			mplayer.Stderr = nil
+		}
 		if vo == "x11" && mplayerDisplay() != "" {
 			env := os.Environ()
 			var filtered []string
@@ -683,7 +690,7 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 
 	// mplayer: плейлист с -fixed-vo (чёрный экран между файлами) и -loop 0 (бесконечный повтор)
 	args := []string{
-		"-really-quiet",    // убрать весь вывод в консоль (скрыть терминал)
+		"-quiet",           // убрать вывод в консоль (но оставить ошибки)
 		"-noconfig", "all", // не читать конфиг (избежать конфликтов)
 		"-fixed-vo",  // не закрывать окно между файлами (важно для киоска!)
 		"-loop", "0", // бесконечный повтор плейлиста
@@ -702,9 +709,16 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	// Добавляем все файлы как аргументы
 	args = append(args, files...)
 	mplayer = exec.Command("mplayer", args...)
-	// Перенаправляем вывод в /dev/null чтобы не видно было терминал
-	mplayer.Stdout = nil
-	mplayer.Stderr = nil
+	// Логируем ошибки в файл для отладки (но не выводим на экран)
+	logFile, err := os.OpenFile(filepath.Join(mediaDir, ".mplayer-errors.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		mplayer.Stderr = logFile
+		mplayer.Stdout = logFile // также логируем stdout для отладки
+	} else {
+		// Если не удалось открыть файл, перенаправляем в /dev/null
+		mplayer.Stdout = nil
+		mplayer.Stderr = nil
+	}
 	if vo == "x11" && mplayerDisplay() != "" {
 		env := os.Environ()
 		var filtered []string
