@@ -623,29 +623,6 @@ func xauthPath() string {
 	return ""
 }
 
-// detectHDMIAudioDevice автоматически определяет HDMI звуковую карту из /proc/asound/cards
-func detectHDMIAudioDevice() string {
-	data, err := os.ReadFile("/proc/asound/cards")
-	if err != nil {
-		return "plughw:2,0" // значение по умолчанию
-	}
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		// Ищем строки с "hdmi" (независимо от регистра)
-		if strings.Contains(strings.ToLower(line), "hdmi") {
-			// Извлекаем номер карты (первое число в строке)
-			fields := strings.Fields(line)
-			if len(fields) > 0 {
-				var cardNum int
-				if _, err := fmt.Sscanf(fields[0], "%d", &cardNum); err == nil {
-					return fmt.Sprintf("plughw:%d,0", cardNum)
-				}
-			}
-		}
-	}
-	return "plughw:2,0" // если HDMI не найден, используем значение по умолчанию
-}
-
 // runConcatPlayback запускает mplayer/mpv с плейлистом файлов (без ffmpeg concat).
 // Плейлист работает стабильнее на стыках файлов, чем склеивание через pipe.
 func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
@@ -655,9 +632,8 @@ func runConcatPlayback(mediaDir string) (ffmpeg *exec.Cmd, mplayer *exec.Cmd) {
 	}
 	// Видеовыход: в графической среде (десктоп) — x11, иначе fbdev2/drm (консоль/без дисплея)
 	vo := mplayerVideoOutput()
-	// Автоматически определяем HDMI карту, если не задана переменная окружения
-	defaultDevice := detectHDMIAudioDevice()
-	audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", defaultDevice)
+	// Используем hw=2,0 как было в рабочей версии (можно переопределить через MPLAYER_AUDIO_DEVICE)
+	audioDevice := getEnv("MPLAYER_AUDIO_DEVICE", "hw=2,0")
 
 	if videoPlayerCmd == "mpv" {
 		// mpv: x11 (gpu/drm при запуске от root часто дают Permission denied / DRM busy)
