@@ -69,6 +69,17 @@ func main() {
 	mac := macAddressString()
 	fmt.Printf("[mediaplayer] запуск, MAC=%s, SERVER=%s, MEDIA_DIR=%s\n", mac, cfg.ServerURL, cfg.MediaDir)
 
+	// Логирование состояния системы каждые 5 минут
+	systemLogFile := filepath.Join(cfg.MediaDir, ".system.log")
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		logSystemState(systemLogFile) // сразу при старте
+		for range ticker.C {
+			logSystemState(systemLogFile)
+		}
+	}()
+
 	runStartupChecks()
 
 	// 1. Чек-ин каждые 10 минут (при 401 не выходим, продолжаем ждать)
@@ -216,6 +227,61 @@ func main() {
 			fmt.Println("[mediaplayer] 4:00 — синхронизация медиа")
 			syncAndPlay()
 		}
+	}
+}
+
+// logSystemState записывает состояние системы (CPU, память, температура) в лог
+func logSystemState(logFile string) {
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	var logLines []string
+
+	// Температура
+	if tempData, err := os.ReadFile("/sys/class/thermal/thermal_zone0/temp"); err == nil {
+		var temp int
+		if _, err := fmt.Sscanf(strings.TrimSpace(string(tempData)), "%d", &temp); err == nil {
+			logLines = append(logLines, fmt.Sprintf("[%s] Temp: %.1f°C", now, float64(temp)/1000))
+		}
+	}
+
+	// Загрузка CPU
+	if loadData, err := os.ReadFile("/proc/loadavg"); err == nil {
+		fields := strings.Fields(string(loadData))
+		if len(fields) >= 3 {
+			logLines = append(logLines, fmt.Sprintf("[%s] Load: %s %s %s", now, fields[0], fields[1], fields[2]))
+		}
+	}
+
+	// Память
+	if memData, err := os.ReadFile("/proc/meminfo"); err == nil {
+		memLines := strings.Split(string(memData), "\n")
+		var memTotal, memFree, memAvailable int
+		for _, line := range memLines {
+			if strings.HasPrefix(line, "MemTotal:") {
+				fmt.Sscanf(line, "MemTotal: %d", &memTotal)
+			}
+			if strings.HasPrefix(line, "MemFree:") {
+				fmt.Sscanf(line, "MemFree: %d", &memFree)
+			}
+			if strings.HasPrefix(line, "MemAvailable:") {
+				fmt.Sscanf(line, "MemAvailable: %d", &memAvailable)
+			}
+		}
+		if memTotal > 0 {
+			memUsed := memTotal - memAvailable
+			memPercent := float64(memUsed) / float64(memTotal) * 100
+			logLines = append(logLines, fmt.Sprintf("[%s] RAM: %dMB/%dMB (%.1f%%)", now, memUsed/1024, memTotal/1024, memPercent))
+		}
+	}
+
+	// Записываем все строки
+	for _, line := range logLines {
+		f.WriteString(line + "\n")
 	}
 }
 
